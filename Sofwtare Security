@@ -1,0 +1,526 @@
+In this file I explain my projects of Software Security.
+The aim of this exam is provided the basis of SECURITY and SAFE of systems. In particular these projects are assigned to using
+the (static and dinamic) tools. With our knowledges and tools we found the bugs/vulnerabilities of C/Java/php/html system.
+Naturally, at the end of this course I did the final write test on others argouments (obfuscation, rule java programming, 
+definition of non-termination, Security in the process of Software Development Life Cycle, ... ).
+
+
+PROJECT 1
+
+Project1 of MATTEO LIBERTI. Matricola: 1712809.
+Splint description
+The strength of Splint is to be able to identify in the program (in a static way) not only the security vulnerabilities but
+also the problems related to the style and completeness of the code, regardless of what came before or after it. 
+On the one hand it is advantageous but on the other hand, an excessive number of problems, 
+it requires more time to analyze them and in the company time is money. 
+A solution, for errors that are related to style and completeness would be to inhibit them, that is, 
+to ensure that the system does not report them, however, if there were some that are important, 
+we could turn them into "False negatives" (example in A.c with the inactivity of argc). 
+A weak and strong point of this tool is that it has its own documentation so it is necessary to have good knowledge of the latter
+in order to understand each single problem and find the appropriate solution. 
+A further strong point is the possibility given to the programmer to comment: the variables, the methods, etc. to increase 
+the information that the tool has, however, this takes a long time and doing it for each type of variable on 1000 lines 
+of code involves further additional work. Another negative point is that the tool does not recognize some functions of the libraries 
+so it cannot do a vulnerability analysis on these. In conclusion, if the program has syntax errors then it crash.
+
+File Analysis
+Before seeing the files let's focus on the structure of the output. This tool reports errors for each function 
+in the order in which they were read (or written), so vulnerabilities are not given priority.
+For each function the row, the column and the type of error are reported; the code is provided in order to inhibit the problem.
+Here another dilemma arises: "Why should I inhibit a type of error rather than having a tool that recognizes which piece of code is not harmful
+to my system?". Concluding you must always have the documentation close to understand if the problem identified by Splint is related to the vulnerability
+or not.
+
+File A.c:
+char *stringcopy(char *str1, char *str2)
+{
+while (*str2)
+*str1++ = *str2++;
+return str2;
+}
+main(int argc, char **argv)
+{
+char *buffer = (char *)malloc(16 * sizeof(char));
+stringcopy(buffer, argv[1]);
+printf("%s\n", buffer);
+}
+
+
+We analyze errors based on the order and function in which they are located:
+  1. Stringcopy:
+      a. The while loop does not contain a bool value. This results in an error in the program's semantics and 
+         is not related to the vulnerability (since you cannot execute the code you cannot know if the while loop carries out
+         a check on str2 of this type: *str2 ! = '\0').
+      b. The stringcopy function returns the value of str2 so data can be lost within the function. 
+         This problem is related to the style and completeness of the program (IN THIS CASE).
+  2. Main:
+      a. The stringcopy function would take input buffers that could be null. In this case we have implemented a malloc 
+         and we have cast it, so it is necessary to check that the value that takes in input the read function is not null. 
+         It can be noted that the tool advises to comment with /*@out@*/ to get more information about this variable.
+      b. The buffer variable is not completely defined. This problem is a false negative about security since buff was initialized 
+         and definitively defined in the stringcopy function.
+      c. The result that returns from the stringcopy function is not used. Here we have a problem not related to security 
+         and not having the specifics of the code, I can implement the choice that I prefer (I cast it to void).
+      d. The main function must return an int not a void. Also this problem is not related to the security 
+         but to the style and completeness of the program since, even if the function does not report any value, 
+         it automatically returns 0 (and this has been tested). However, the output of the main function is updated to an int.
+      e. The memory allocated within this function is not released. This problem is very important for the vulnerability because: 
+         too much allocation carries a buffer overflow and, allocating memory without keeping a global variable that can save 
+         the address of the allocation, leads to the loss of the address so as to be unable to implement a free on its. 
+         The question to ask is: "If I were to execute the function 10000 times would it go into bufferoverflow?".
+         This answer can only provide us with a dynamic tool, but even the static one recognizes this vulnerability. 
+         The problem is curbed by a “Free()” on buffer.
+      f. The tool reports that argc is not used. This is a variable that provides the exact number of arguments in argv. 
+         In reality it is not an important error at first sight but it is easy to see, to the eye, that if argc were 1 
+         (since the minimum value is 1) then argv [1] goes into buffer overflow. We can solve the problem in two ways, 
+         starting from two different points of view: we did not realize that argv could go into buffer overflow or that we noticed it. 
+         The second case has been reported below, in the first case we implement a check on argc: if (argc < 3) return 0.
+      g. The stringcopy function is used only within this file. Since it is not an object-oriented programming language, 
+         the private method cannot be made, but this question can be solved either by inhibiting Splint's error or by bringing 
+         the function into the main. For simplicity we inhibit it.
+
+I conclude by making the following changes in order to solve the problems returned by Splint (the file will contain other errors 
+that will be discussed in the conclusion):
+char *stringcopy(char *str1, char *str2)
+{
+// the while loop contains a bool
+while (*str2 != ’\0’)
+*str1++ = *str2++;
+return str2;
+}
+// the main function returns an int
+// argc is defined as unused
+int main(/*@unused@*/ int argc, char **argv)
+{
+char *buffer = (char *)malloc(16 * sizeof(char));
+// the problem of the buffer null is eliminated
+if (buffer == NULL) return 1;
+// the problem of using the returned value is solved
+(void)stringcopy(buffer, argv[1]);
+printf("%s\n", buffer);
+// memory is released
+free(buffer);
+// return 0 to get a better stylistic code
+return 0;
+}
+
+
+File B.c:
+#include <stdlib.h>
+void func(int fd)
+{
+char *buf;
+size_t len;
+read(fd, &len, sizeof(len));
+if (len > 1024)
+return;
+buf = malloc(len+1);
+read(fd, buf, len);
+buf[len] = '\0';
+}
+The following problems are illustrated:
+   The read function has not been recognized. Not recognizing this function is difficult to say whether it is a security issue 
+     or something, plus you cannot know if it is a false positive or a true positive because the tool says only: 
+     "I do not find its implementation".
+   Len has not been initialized. This, according to Splint, could lead the programmer to forget to initialize it later. 
+     It is not related to security.
+   Buf could be a null pointer. In reality it is initialized subsequently so it would be a false positive. 
+     In this case the tool tells us: "Remember that you have to initialize it otherwise you have a pointer pointing to nothing". 
+     This is also the same problem as before, since forgetting to initialize it I could use a null value. 
+     Here it is noted that Splint is too hasty to report errors, rather than wait and see if the value has been initialized 
+     subsequently avoiding so many false positives.
+   As in the previous file we have problems with the malloc because the memory is not released. The reader is referred to the 
+    explanation of the malloc of the A.c. file.
+
+The correct code is as follows:
+#include <stdlib.h>
+void func(int fd)
+{
+char *buf;
+//len has been initialized and defined before its use
+size_t len = NULL;
+//the read function is not recognized (Flawfinder
+// can be used to solve this problem)
+read(fd, &len, sizeof(len));
+if (len > 1024) { return; }
+buf = malloc(len + 1);
+//verify that buf is not null
+if (buf == NULL) { return; }
+read(fd, buf, len);
+buf[len] = '\0';
+//the space allocated with buf is deallocated
+free(buf);
+}
+
+File C.c:
+#include <stdlib.h>
+void func(int fd)
+{
+char *buf;
+size_t len;
+read(fd, &len, sizeof(len));
+buf = malloc(len+1);
+read(fd, buf, len);
+buf[len] = '\0';
+}
+
+The problems are the same as those of the B.c file but there is a small but substantial difference: 
+this piece of code can go into buffer overflow because it does not control the upper limit of buff, via len. The read function, 
+as it will be explained in the analysis of the file B.c with Flawfinder, does not do such control so in this case 
+the attacker could have a good vulnerability to exploit.
+The solution is as follows:
+#include <stdlib.h>
+void func(int fd)
+{
+char *buf;
+//len has been initialized and defined before its use
+size_t len = NULL;
+//the read function is not recognized (Flawfinder
+// can be used to solve this problem)
+read(fd, &len, sizeof(len));
+buf = malloc(len + 1);
+//verify that buf is not null
+if (buf == NULL) { return; }
+read(fd, buf, len);
+buf[len] = '\0';
+//the space allocated with buf is deallocated
+free(buf);
+}
+
+
+
+Flawfinder summary
+Flawfinder is a static analysis tool that uses a database of functions in C, not protected, to report to the programmer 
+all the possible vulnerabilities related to them. The database used is called "ruleset". Thanks to its use, 
+Flawfinder identifies the dangerous functions and reports the problems connected to them. The weak point is that 
+it will necessarily produce many false negatives for vulnerabilities not related to functions not in the database; in fact, 
+if we put ourselves in the case of C neo-programmers, who use the functions of special libraries for memory management 
+and these were stored in the ruleset, then this tool is very advantageous, otherwise, relying only on this tool, 
+we could leave a lot of vulnerability in the program. A strong point concerns the controls that 
+the tool tells us to perform on the variables that we give in input to the functions (always present in the ruleset). 
+A further strength of Flawfinder is the type of output. This is very simple to read and provides error codes, 
+allowing you to have a substantial description found on the internet (even with examples). 
+A further strong point is that even if the code is incomplete, the tool understands what the system's vulnerabilities could be related
+to the functions and reports the problems based on the priority he estimates.
+
+Concluding: Flawfinder in such situations is very useful, but when other methods are implemented, this fails miserably, 
+and reports every type of error for each type of function recognized, without checking if that type of problem exists or not.
+The difference between the two tools is shown in the conclusion of the report.
+
+
+File analysis
+Before seeing the analysis reported by the tool, we focus on its structure. This consists of final result and Analysis summary. 
+The first part concerns the function that is considered harmful for the system and the type of error that must be managed; 
+the latter is one of its strong points, in fact on the internet there is a detailed description of the error code 
+(ie the whole problem is explained with relative examples). The second part of the output is linked to "Hits", 
+ie Flawfinder identifies the danger of the flow by expressing a vote from 0 to 5. The minimum level of global risk is always 1, 
+by definition of the documentation. We will focus only on the analysis of Final result.
+Finally, we define the following two problems because they are the only ones that have been reported during the analysis of the 3 files. 
+CWE-20: improper Iput Validation and CWE-120: Buffer Copy without Checking Size of Input (“Classic Buffer Overflow”). 
+The first concerns a check not performed on the input, this can lead to the use of invalid values to perform operations or functions 
+on them. The second concerns the possibility that the limit of the size, both upper and lower, is not controlled by a buffer.
+
+File A.c:
+char *stringcopy(char *str1, char *str2)
+{
+while (*str2)
+*str1++ = *str2++;
+return str2;
+}
+main(int argc, char **argv){
+char *buffer = (char *)malloc(16 * sizeof(char));
+stringcopy(buffer, argv[1]);
+printf("%s\n", buffer);
+}
+In this case no error was found, ACCORDING TO HIM. This is because the database does not have the stringcopy function, 
+which we implemented. In this case we have several false negatives (see the analysis of the Splint A.c file). 
+By relying only on this tool we can say that this piece of code is safe, even if it is not really because stringcopy is 
+a custom function of the strcpy. This last is in the Ruleset therefore it is dangerous for our system.
+
+
+File B.c:
+#include <stdlib.h>
+void func(int fd)
+{
+char *buf;
+size_t len;
+read(fd, &len, sizeof(len));
+if (len > 1024)
+return;
+buf = malloc(len+1);
+read(fd, buf, len);
+buf[len] = '\0';
+}
+The final results reported two errors with the following codes: CWE-20 and CWE-120 and with relative mini-description 
+(the reader is referred to the introduction of this paragraph to understand the error codes).
+Before analyzing the problems you open a parenthesis on the read function: when we talk about this function we will refer 
+to the method described in the lesson with its description, so you only have to check up to what index the buffer should and can be
+read. The first read function regards the input parameters: fd, &buf and sizeof (len). 
+Sizeof (len) is worth 8 when cast to int, this has been tested manually. We therefore have a constant value.
+Fd and buf are controlled by the function. The control that the function performs, in addition to those of the null pointer, 
+should be as follows: fd> = 0 && fd <sizeof (len) (8). In case this is not done we can always add such checks.
+We can conclude that: the first error (CWE-120) reported is a false positive because the only value taken in input is fd and 
+this is controlled by the read function, and also the second error (CWE-20) is a false positive because sizeof (len) is constant (>-1).
+In the second case we have the same error but this time the variables involved are: fd, buf, len. Again we can assume that 
+the read function does the checks explained above, so just check len. Since len is a size_t, then an unsigned int, 
+the value is always > -1 so just check the upper limit. This check is done through the following code: "if (len <1024)". 
+Since buf is initialized, we have all the correct values that meet the desired criteria. We affirm with certainty that 
+this is also a false positive.
+
+In conclusion, at the end of the execution of this tool, the code is correct (trusting only with Flawfinder).
+File C.c:
+#include <stdlib.h>
+void func(int fd)
+{
+char *buf;
+size_t len;
+read(fd, &len, sizeof(len));
+buf = malloc(len+1);
+read(fd, buf, len);
+buf[len] = '\0';
+}
+
+In this case we have the same output as for file B.c but this time the control on the upper limit of len is not performed. 
+We have, if errors are counted according to the codes, 3 false positives out of 4 and the error CWE-120, in the second function read, 
+is a problem that would cause the system to crash because if len = 2000 then the buf goes in buffer overflow.
+In conclusion, at the end of the execution of this tool, the correct code is that of the B.c.
+
+
+Conclusion
+We can see, after seeing the execution of the tools on each file, that flawfinder, being based on a database,
+is not too reliable if you do not use the functions inside.
+"Could you say that Splint is much better than the flawfinder?" "No". Unfortunately, Splint not only reports errors of 
+vulnerability indeed, it reports too many about other types. In fact, applying it to 100 lines of code would result in an analysis 
+of weeks and, in the company, this is not feasible (even in reality); moreover it does not recognize all the functions in the libraries.
+Then we can ask ourselves: "If we only used the functions that has flawfinder, could we have a good tool for static analysis?" 
+Here too "NO". Splint can find vulnerabilities that are not necessarily related to
+functions. In some cases it could report problems linked, in a subordinate manner, to problems of vulnerability (eg argc in A.c).
+Splint could be used by inhibiting certain non-safety related problems and resulting in less work. Even if we inhibit such problems 
+we may have some important "False negative" outputs, in fact, in the A.c file, the inability of argc is important because 
+the minimum number of argv elements is not checked. In conclusion, Splint does not support all libraries so even he is limited 
+in this respect.
+A parenthesis is opened on the comments: Flawfinder correctly ignores the text within comments and strings, compared to Splint that 
+owns it as a main and usable feature.
+The speech ends with the following sentence:
+"There is no universal tool that can give all the right answers. Each tool has its own specialty, its purpose and its characteristics 
+that make it efficient and unique in some blocks of codes and useless in others ".
+Problems in A.c
+The following file contains issues that only dynamic tools can solve:
+• The stringcopy function checks only on str2 but not on str1, result: str1 may not have enough size to copy the entire str2. 
+The question that has been asked is the following: "If str1 has no more space and str2 contains at least 2 other values, what happens?" 
+Buffer overflow, vulnerability that the attacker can exploit.
+• argc is not used but it represents the number of values that argv possesses. If argv had a number of values less than 1, 
+then argc is equal to 1, then argv [1] goes into buffer overflow.
+• The tools, because STATIC, cannot find the following vulnerability: if argv gets to have a size greater than 16 * size_of (char) 
+then executing the stringcopy function and doing only the control on str2, the buffer (ie str1) goes into buffer overflow.
+• The last problem concerns the printf. One wonders: all the values taken in input, starting from argv [1], have been checked? 
+That is, all the characters are of the ASCII type? No, for this it would be appropriate to validate the input via a white list.
+• Str2 may be modified during use, then increase or decrease its size when stringcopy is executed.
+
+
+
+
+
+
+
+
+
+
+
+
+
+Project 2
+file
+/* ESC/Java2 Exercise: 
+   
+   This class implements a Bag of integers, using an array 
+ and an integer to represent its cardinality.
+
+   Add JML specs to this class, to stop ESC/Java2 from complaining and 
+ to verify that the code performs as requested
+
+   However, beware that there are also errors in the code that you may
+   have to fix to stop ESC/Java2 from complaining. (More generally, 
+   you may improve the code to make it easier to specify in JML, 
+   but _*only*_  if you think this makes the code better/easier 
+   to understand).
+
+   The only JML keywords needed for this are
+      requires
+      invariant 
+      ensures 
+  
+   If you want, you can also use
+      non_null
+   as abbreviation.
+
+
+   While developing your specs, it may be useful to use the keywords
+      assert
+   to add additional assertions in source code, to find out what 
+   ESC/Java2 can - or cannot - prove at a given program point.
+  
+*/
+
+class Bag {
+
+ //@ invariant contents != null;
+  int[] contents;
+  //@ invariant n >= 0;
+  //@ invariant n<=contents.length;
+  int n;
+  
+  //@ requires input != null;
+  Bag(int[] input) {
+    n = input.length;
+    contents = new int[n];
+    arraycopy(input, 0, contents, 0, n);
+  }
+
+  Bag() {
+    n =0;
+    contents = new int[0];
+  }
+
+/* the next method should remove only the first occurrence of elt */
+  void deleteFirst(int elt) {
+  //the = has been removed due to buffer overflow problems
+    for (int i = 0; i < n; i++) {  
+      if (contents[i] == elt ) {
+         n--;
+         contents[i] = contents[n];
+         return;
+      }
+    }
+  }
+
+/* the next method should remove from the array *all* the occurrences of elt */
+  void deleteAll(int elt) {
+  //the = has been removed due to buffer overflow problems
+    for (int i = 0; i < n; i++) {  
+      if (contents[i] == elt ) {
+         n--;
+         contents[i] = contents[n];
+      }
+    }
+  }
+
+
+
+  
+  int getCount(int elt) {
+    int count = 0;
+ //the = has been removed due to buffer overflow problems
+    for (int i = 0; i < n; i++) 
+  //a "=" was added because it generated a syntax error
+  if (contents[i] == elt) count++; 
+    return count;
+  }
+
+  /* Warning: you may have a hard time checking the method "add" below.
+     ESC/Java2 may warn about a very subtle bug not easy to spot. 
+   */
+
+
+  void add(int elt) {
+    if (n == contents.length) {
+ //"+1" has been added because if n = 0 then 2 * n = 0; 
+       int[] new_contents = new int[2*n+1]; 
+       arraycopy(contents, 0, new_contents, 0, n);
+       contents = new_contents;
+    }
+    contents[n]=elt;
+    n++;
+  }
+
+
+//@ requires b != null;
+  void add(Bag b) {
+    int[] new_contents = new int[n + b.n];
+    arraycopy(contents, 0, new_contents, 0, n);
+ //"+1" has been removed at n to avoid buffer overflow problems
+    arraycopy(b.contents, 0, new_contents, n, b.n);
+    contents = new_contents; 
+  }
+
+
+//@ requires a != null;
+  void add(int[] a) {
+    this.add(new Bag(a));
+  }
+
+//@ requires b != null;
+  Bag(Bag b) {
+  //the object has been initialized to avoid buffer overflow problems
+    this(); 
+    this.add(b);
+  }
+
+
+
+//@ requires src != null;
+//@ requires dest != null;
+//@ requires srcOff >= 0;
+//@ requires destOff >= 0;
+//@ requires length >= 0;
+//@ requires dest.length >= destOff + length;
+//@ requires src.length >= srcOff + length;
+  private static void arraycopy(int[] src,
+                                int   srcOff,
+                                int[] dest,
+                                int   destOff,
+                                int   length) {
+ //the = has been removed due to buffer overflow problems
+    for( int i=0 ; i<length; i++) {
+       dest[destOff+i] = src[srcOff+i];
+    }
+  }
+  
+}
+
+
+
+•	In the end, do you think that you found all problems? Are you certain now that the code is correct?
+  I think I found all the problems, but now, because I do not know if, in the future, they can find some other way to attack my system.
+  I can say with certainty that the program is not safe because I added annotations, that is, I have ensured a simpler reading of the code.
+  The code would be correct if I introduced, in the code, the controls expressed in the annotations then I can say to have a code, 
+  at the moment, correct.
+  Example: Bag (int [] a) {
+  if (a == null) new throw Nullpointerexception("null value");
+  ...}
+  So I always handle the exception.
+
+•	Can you think of ways in which the tool or the specification language could be improved? 
+  Yes, ESC / JAVA2 should tell us not only the error but also what causes it so you can check if you need to change the code or 
+  add an annotation (congruent to the reported error). Finally, it could help the programmer by reporting the possible solutions 
+  for each error reported.
+•	Instead of the tool we used, can you think of other ways (formal or informal, tool-supported or not) to find the problems
+  that the tool found? If so, would these alternatives
+    o	find fewer of the problems, the same, or more?
+    o	find problems sooner or later than the current approach?
+    o	require more work or less work?
+    o	provide you with more confidence or less confidence that the code is correct?
+  
+  Yes, you can perform a dynamic analysis of the code by testing it either in white-box or in balck-box (if possible). 
+  The order is important because in the first case there are problems that were not found during the analysis,
+  the design or the programming; in the second case we test a possible external attack by simulating a malintenzinato 
+  that does not know the system (always if possible).
+    1. This can not be said because it depends on the code and the tools used, however, with this method, and with the supervision of an expert, you can TEST more attacks.
+    2. Find them later because it takes more time to test the code.
+    3. Naturally it requires a lot more work.
+    4. If you test the program correctly, you have a higher security percentage but it is not always SURE.
+
+
+
+
+
+Group Project on FluxBB (https://fluxbb.org/)
+
+
+
+
+
+
+
+
+
