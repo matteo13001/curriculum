@@ -1,7 +1,7 @@
 # curriculum
-This is my curriculum, in particular, all the projects I've done. This part is finalized represent my competencies in every exam I've work.
+This is my curriculum, in particular, all the projects I've done. This part is finalized to represent my competencies in every exam I've worked.
 
-I am Matteo Liberti, a student of the first year of Magistrale at university "La Sapienza". 
+I am Matteo Liberti, a first-year student of the of Magistrale at university "La Sapienza". 
 During my first semester, I've done one or more projects in software security, computer vision.
 I submit these projects and their description.
 
