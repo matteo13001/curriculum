@@ -1,0 +1,361 @@
+
+
+Group Project on FluxBB (https://fluxbb.org/)
+
+
+Group Project Lorenzo Manduca – Andrea Magnante – Matteo Liberti Preface All tests were carried out on the application Fluxbb 
+Current stable release (v1.5.10)with default settings. FluxBB is fast, light, user-friendly forum software for your website. 
+It’s designed as a good alternative to some of the traditional feature heavy forum applications. 
+It is easy to use and has a proven track record of stability and security making it an ideal choice of forum for your website.
+First Step The assigned requirements were: 
+  - V7: Cryptography at rest verification requirements
+  - V10: Communications security verification requirements
+There are more ways to find out what we are looking for. In particular, trying to find possible vulnerability within Fluxbb, 
+we used the suggested tools (RIPS, RATS) and also OWASP ZAP, WIRESHARK. After that we did a code review with grep to find, 
+using key word, possible vulnerable file. 
+   TOOLS 
+      1. RIPS
+          RIPS is the most popular static code analysis tool to automatically detect 
+          vulnerabilities in PHP applications. By tokenizing and parsing all source code files, RIPS is able to transform PHP 
+          source code into a program model and to detect sensitive sinks (potentially vulnerable functions) that can be tainted 
+          by user input (influenced by a malicious user) during the program flow. Besides the structured output of found 
+          vulnerabilities, RIPS offers an integrated code audit framework.
+    2. RATS 
+        The Rough Auditing Tool for Security is an open source tool developed by Secure Software Engineers. 
+        Since then it has been acquired by Fortify, which continues to distribute it free of charge (here ). 
+        It scans various languages, including C, C++, Perl, PHP and Python. It is very fast and can easily be integrated 
+        into a building process without causing noticeable overhead. Unfortunately its utility is rather limited for PHP 
+        as it does not find Cross-Site Scripting or SQL Injection vulnerabilities.
+    3. OWASP ZAP 
+        The OWASP Zed Attack Proxy (ZAP) is one of the world’s most popular free security tools. It can help you automatically
+        find security vulnerabilities in your web applications while you are developing and testing your applications. 
+        Its also a great tool for experienced pentesters to use for manual security testing. 
+    4. WIRESHARK. 
+        Wireshark is the world’s foremost and widely-used network protocol analyzer. 
+        It lets you see what’s happening on your network at a microscopic level. Wireshark has a rich feature set which 
+        includes the following: 
+             Deep inspection of hundreds of protocols, with more being added all the time 
+             Live capture and offline analysis  Standard three-pane packet browser 
+             Captured network data can be browsed via a GUI
+Report of the tools output From a first overview of tools output, 
+It’s possible to understand that they are not very useful to find out if there are vulnerabilities in FLUXBB applications 
+that concern V7 and V10 requirements. But it’s possible to use tools output to find which files can have security problems, 
+for example the functions.php file.
+
+Second Step
+  Therefore, all assigned requirements were verified and if they were satisfied or not.
+    V7: Cryptography at rest verification requirements
+          Control objective
+            Ensure that a verified application satisfies the following high level requirements:
+                 That all cryptographic modules fail in a secure manner and that errors are handled correctly.
+                 That a suitable random number generator is used when randomness is required.
+                 That access to keys is managed in a secure way.
+  Requirements
+      Requirement ID
+        V7.2 
+          Title: Verify that all cryptographic modules fail securely, and errors are handled in a way that does not enable 
+                 oracle padding.
+          Description: Data sent over the internet is not further encrypted by FluxBB and oracle padding is enabled when no protocols 
+                       (https) are used on which this attack can be performed. 
+          Testing: For the first point, a manual static analysis of the code was performed, verifying whether the data was encrypted
+                    before being sent. For the second point, it is up to the system administrator to use protocols that do not enable 
+                    oracle padding. 
+          Proposed Solution: We need to update the system by coding cryptographic modules that do not fail or if they should fail 
+                    then they are enabled against oracle padding using a good encryption.
+          Verdict: NOT PASSED
+
+      Requirement ID
+        V7.6 
+            Title: Verify that all random numbers, random file names, random GUIDs, and random strings are generated using 
+                   the cryptographic module’s approved random number generator when these random values are intended 
+                   to be not guessable by an attacker
+            Description: If the functions for random values are not approved by the cryptographic module then there is at least
+                         one case in which the attacker can calculate the random values generated by our system. 
+            Testing: A manual analysis of the code was carried out. The functions that affect this point are contained in functions.php
+                    and srand.php. This analysis showed that every function used is either pseudo-random or generates values 
+                    not approved by cryptographic modules. We can state this thanks to the php documentation which shows 
+                    the descriptions of these functions. 
+            Proposed Solution: The functions used to generate random values with other more recent ones approved by 
+                    the cryptographic module must be updated. 
+            Verdict: NOT PASSED
+      Requirement ID
+        V7.7 
+            Title: Verify that cryptographic algorithms used by the application have been validated against FIPS 140-2 
+                   or an equivalent standard.
+            Description: It must be verified that the system has been validated against FIPS 140-2. FIPS 140-2 has 4 levels. 
+                         We expect the first two to be satisfied by an Open-source application, instead, the other two for business 
+                         and / or military software. The reader is referred to the description of the FIPS 140-2 points. 
+            Testing: A manual analysis of the code was made to verify the cryptographic and random modules and, 
+                     by reviewing every point of the V7, it is possible to understand if this application complies with 
+                     the criteria of level 2 (level 1 must be satisfied to check level 2). Unfortunately, it does not even respect 
+                     the first level because encryption is not secure, so it does not even comply with point 2. 
+            Proposed Solution: 
+                Point 1: replace cryptographic functions and random values with more recent ones that are approved 
+                            by cryptographic modules.
+                Point 2: add features to the system that show evidence of tampering and handle them appropriately.
+                In short, update the system so as to satisfy at least the first two points of the FIPS 140-2 
+                Verdict: NOT PASSED
+      Requirement ID
+        V7.8 
+            Title: Verify that cryptographic modules operate in their approved mode according to their published security policies.
+            Description: It is necessary to verify that the cryptographic modules described in the system documentation coincide with those actually implemented.
+                         There is no type of documentation. 
+            Testing: - 
+            Proposed Solution: -
+            Verdict: UNVERIFIABLE
+      Requirement ID
+        V7.9
+            Title: Verify that there is an explicit policy for how cryptographic keys are managed (e.g., generated, 
+                   distributed, revoked, and expired). Verify that this key lifecycle is properly enforced.
+        Description: There is no type of key policy. Their life cycle is not optimal, rather, it is precarious because
+                     they are created when the user registers and are changed if the user changes the value on which the key is based.
+                     Continuing, these values are based on random functions not approved by the cryptographic module. 
+        Testing: Manual static analysis of the tool. A static analysis was performed aimed at the functions.php file 
+        Proposed Solution: Use the appropriate functions for generating random keys and implement their appropriate life cycle. 
+        Verdict: NOT PASSED
+      Requirement ID
+        V7.11 
+          Title: Verify that all consumers of cryptographic services do not have direct access to key material. 
+                 Isolate cryptographic processes, including master secrets and consider the use of a hardware key vault (HSM).
+          Description: This point is too high for an application of this type, in addition, anyone has direct access to the material. 
+                       The HSM would be useless for an open-source tool. 
+          Testing: - 
+          Proposed Solution: - 
+          Verdict: UNVERIFIABLE
+      Requirement ID
+        V7.12 
+           Title: Personally Identifiable Information should be stored encrypted at rest and ensure that 
+                  communication goes via protected channels.
+        Description: The personally identifiable information is passwords and cookies. As for the protected channels: 
+                     they are those used by the Internet so we can say that they are safe, for now. 
+        Testing: After a manual static analysis, we realized that both cookies and passwords are encrypted. This has been verified 
+                 by opening the database and checking the passwords; instead, for cookies, these have been analyzed 
+                 through Google Chrome, opening the settings dedicated to the developers. There are no particular physical channels 
+                 so no tests have been performed. 
+        Proposed Solution: - 
+        Verdict: PASSED
+      Requirement ID
+        V7.13 
+          Title: Verify that sensitive passwords or key material maintained in memory is overwritten with zeros as soon as it no
+                 longer required, to mitigate memory dumping attacks.
+        Description: A memory dump attack is the capture and use of RAM content that was written to a storage drive during 
+                     an unrecoverable error, which was typically triggered by the attacker. Developers commonly use memory dumps 
+                     to gather diagnostic information at the time of a crash to help them troubleshoot issues and 
+                     learn more about the event. Hackers access memory dumps to obtain otherwise protected data or information 
+                     or to compromise the host computer and/or systems it connects to.
+        Testing: -
+        Proposed Solution: FluxBB uses PHP and what this requirement is asking for it’s not possible to made with this language. 
+                           Internally it may be possible to do, however it is currently outside of our control.
+        Verdict: UNVERIFIABLE
+      Requirement ID
+        V7.14 
+            Title: Verify that all keys and passwords are replaceable, and are generated or replaced at installation time.
+            Description: -
+            Testing: Take a look at all fluxbb pages and testing if it’s possible to change password and so on.
+            Proposed Solution: Within FluxBB all specified keys and passwords can be changed at any time by anyone 
+                               with sufficient privilege. It is the responsibility of the system administrator to ensure that
+                               new passwords and keys are generated at the time of installation.
+            Verdict: PASSED
+      Requirement ID
+        V7.15 
+            Title: Verify that random numbers are created with proper entropy even when the application is under heavy load, 
+                   or that the application degrades gracefully in such circumstances.
+        Description: -
+        Testing: -
+        Proposed Solution: As wrote before that 7.6 point is not verified (owasp asked to verify that all random numbers, 
+                etc. are generated using a cryptographic module with no vulnerability) 
+        at the same way v7.15 is not satisfied, because owasp asked the same thing but to verify it when the application is under heavy load.
+        Verdict: NOT PASS
+
+V7 requirement – CONCLUSION
+The tool must be ABSOLUTELY updated as it has serious security problems regarding the encryption of passwords, 
+the generation of random values and the encryption of cookies.
+As you can see, almost all the points fail because the program uses functions that are too old, now insecure or that 
+no longer meet the current security criteria.
+                  
+V10: Communications security verification requirements
+Control objective
+   Ensure that a verified application satisfies the following high level requirements:
+       That TLS is used where sensitive data is transmitted.
+       That strong algorithms and ciphers are used at all times.
+   Requirements
+       Requirement ID
+           V10.1 
+            Title: Verify that a path can be built from a trusted CA to each Transport Layer Security (TLS) server certificate, 
+            and that each server certificate is valid.
+        Description: SSL and TLS protocols require that the SSL or TLS clients and servers that connect exchange certificates. 
+                     The security context that uses a certificate must "trust" the certificate authority (CA) 
+                     that issued the certificate. A certificate authority is trusted by a security context when a certificate 
+                     that is issued by the certificate authority is installed in either that user account or 
+                     in the trusted root certificate store for the security context the server is running in.
+        Testing: -
+        Proposed Solution: Simplest verification for this is to let the browser do the work and visit the application with 
+                           a modern browser. This is the responsibility of the system administrator and the way of how the server
+                           that he uses is setted. Indeed Fluxbb allows to use both HTTPS and HTTP, as we can find making a code review.
+        Verdict: UNVERIFIABLE
+      Requirement ID
+        V10.3 
+            Title: Verify that TLS is used for all connections (including both external and backend connections) 
+                   that are authenticated or that involve sensitive data or functions, and does not fall back to insecure or unencrypted
+                   protocols. Ensure the strongest alternative is the preferred algorithm.
+          Description: -
+          Testing: -
+          Proposed Solution: We can verify this point doing a code review. Fluxbb provides support for connecting to all resources 
+                            via TLS secured connections. It is the responsibility of the system administrator to ensure
+                            that all Fluxbb’s connections are configured to connect to are configured via TLS portals.
+          Verdict: PASS
+      Requirement ID
+        V10.4 
+            Title: Verify that backend TLS connection failures are logged.
+            Description: -
+            Testing: -
+            Proposed Solution: The system administrator will have the responsibility to check this point.
+            Verdict: UNVERIFIABLE
+      Requirement ID
+        V10.5 
+            Title: Verify that certificate paths are built and verified for all client certificates using configured trust anchors and revocation information.
+        Description: -
+        Testing: -
+        Proposed Solution: As in the previous requirement, it’s the responsibility of the system administrator.
+        Verdict: UNVERIFIABLE
+      Requirement ID
+        V10.6 
+        Title: Verify that all connections to external systems that involve sensitive information or functions are authenticated.
+        Description: -
+        Testing: -
+        Proposed Solution: The system administrator will have the responsibility to check this point.
+        Verdict: UNVERIFIABLE
+      Requirement ID
+        V10.8 
+        Title: Verify that there is a single standard TLS implementation that is used by the application that is configured 
+               to operate in an approved mode of operation.
+        Description: -
+        Testing: -
+        Proposed Solution: The system administrator will have the responsibility to check this point.
+        Verdict: UNVERIFIABLE 
+      Requirement ID
+        V10.10 
+          Title: Verify that TLS certificate public key pinning (HPKP) is implemented with production and backup public keys. 
+                 For more information, please see the references below.
+          Description: HTTP Public Key Pinning (HPKP) is an Internet security mechanism delivered via an HTTP header 
+                       which allows HTTPS websites to resist impersonation by attackers using mis-issued  
+                       otherwise fraudulent certificates. In order to do so, it delivers a set of public keys to the client (browser), 
+                       which should be the only ones trusted for connections to this domain. Testing
+          Testing: - 
+          Proposed Solution: The system administrator will have the responsibility to check this point.
+          Verdict: UNVERIFIABLE
+      Requirement ID
+        V10.11 
+          Title: Verify that HTTP Strict Transport Security headers are included on all requests and for all subdomains, 
+                 such as Strict-Transport-Security: max-age=15724800; includeSubdomains
+        Description: HTTP Strict Transport Security (HSTS) is a web security policy mechanism that restricts web browsers 
+                     to access web servers only over HTTPS and so helps to protect websites against protocol downgrade attacks 
+                     and cookie hijacking. This ensures the connection cannot be establish through an insecure HTTP connection 
+                     which could be susceptible to attacks. HSTS is defined in the response header as Strict-Transport-Security 
+                     and once the supported browser receives that header it knows to deliver all information over HTTPS.
+        Testing: We started the application using MAMP PRO (establish HTTPS connection) and then we inspected through the use 
+                 of the Chrome Browser the response header of any page of the site (in our case the page login.php)
+                 We noticed that the header "Strict-Transport-Security: max-age=31536000; includeSubDomains" was actually present. 
+                 The parameter "max-age" differs from what is required in the specification but, since it is expressed in seconds 
+                 and 31.536.000 seconds are a good approximation of a year, we can say that through the use of HTTPS connection 
+                 the point is verified correctly. This requirement is not verified, as we expected, using HTTP connections.
+        Proposed Solution: The system administrator will have the responsibility to check and configure it correctly.
+        Verdict: WE DON’T KNOW
+        
+      Requirement ID
+        V10.12 
+          Title: Verify that production website URL has been submitted to preloaded list of Strict Transport Security domains maintained
+                 by web browser vendors. Please see the references below.
+        Description: This requirement allows that HSTS to be hardcoded in the web browser. It solves the "Trust On The First Use" 
+                     problem. In fact, HSTS for a domain can be registered on, for example, https://hstspreload.org
+        Testing: -
+        Proposed Solution: The system administrator will have the responsibility to check this point.
+        Verdict: UNVERIFIABLE 
+      Requirement ID
+        V10.13 
+          Title: Ensure forward secrecy ciphers are in use to mitigate passive attackers recording traffic.
+          Description: Perfect Forward Secrecy is an attribute of the specific key exchange mechanisms in SSL/TLS security protocols 
+                       that implies the independence of the session key generated during the secure session establishment from 
+                       the set of long-term Public and Private keys and the session keys used in previous sessions.
+                       In fact, by generating a unique session key for every session that a user initiates, even the compromise 
+                       of a single session key will not affect any data other than that exchanged in the specific session protected 
+                       by that particular key.
+          Testing: Only the Diffie-Hellman Ephemeral (DHE) and its lighter version based on Elliptic Curves (ECDHE) key exchange 
+                   mechanisms provide the Forward Secrecy.
+                   Is necessary configure servers (Apache/Nginx) to use the ECDHE suites at the top of list, followed by the DHE suites.
+                   Is also necessary to enable other non-DH-key-exchange cipher suites from the list of cipher suites offered 
+                   by the SSL Client.
+          Proposed Solution: The system administrator will have the responsibility to check this point.
+          Verdict: UNVERIFIABLE 
+        Requirement ID
+           V10.14 
+           Title: Verify that proper certification revocation, such as Online Certificate Status Protocol (OCSP) Stapling, 
+                  is enabled and configured.
+        Description: OCSP is an Internet protocol used for obtaining the revocation status of an X.509 digital certificate. 
+                     It allows to verify the revocation of certificates in real time, offering a faster, easier 
+                     and more reliable system for the validation of digital certificates than that offered by the traditional download
+                     and processing of Certificate Revocation Lists (CRL).
+        Testing: -
+        Proposed Solution: The system administrator will have the responsibility to check this point.
+        Verdict: UNVERIFIABLE
+      Requirement ID
+        V10.15 
+        Title: Verify that only strong algorithms, ciphers, and protocols are used, through all the certificate hierarchy, 
+               including root and intermediary certificates of your selected certifying authority.
+        Description: To have a secure communication, is necessary:
+             Use Strong Private Key (for example RSA 2048 bit that provide about 112 bits of security or ECDSA at 256 bits that provide 128 bits of security.
+             Protect Private Keys (Generate private keys on a trusted computer with sufficient entropy)
+             Obtain Certificates from a Reliable CA
+             Use Strong Certificate Signature Algorithms (for example SHA256)
+             Use Complete Certificate Chains
+             Use Secure Protocols (SSL/TLS)
+             Use Secure Cipher Suites (using AEAD suites provide strong authentication and key exchange, forward secrecy, and encryption of at least 128 bits)
+             Select Best Cipher Suites
+             Use Forward Secrecy (is better to use ECDHE suites in order to enable forward secrecy with modern web browsers)
+             Encrypt Everything
+             Secure Cookies
+             Secure HTTP Compression
+             Deploy HTTP Strict Transport Security
+             Deploy Content Security Policy
+             Do Not Cache Sensitive Content
+             Public Key Pinning 
+        Testing: -
+        Proposed Solution: The system administrator will have the responsibility to check this point.
+        Verdict: UNVERIFIABLE
+      Requirement ID
+        V10.16 
+          Title: Verify that the TLS settings are in line with current leading practice, particularly as common configurations, 
+                 ciphers, and algorithms become insecure.
+          Description: There are five protocols in the SSL/TLS family: SSL v2, SSL v3, TLS v1.0, TLS v1.1, and TLS v1.2:
+               SSL v2 is insecure and must not be used. This protocol version is so bad that it can be used to attack RSA keys
+                 and sites with the same name even if they are on an entirely different servers (the DROWN attack).
+               SSL v3 is insecure when used with HTTP (the POODLE attack) and weak when used with other protocols. 
+                  It’s also obsolete and shouldn’t be used.
+               TLS v1.0 is also a legacy protocol that shouldn't be used, but it's typically still necessary in practice. 
+                  Its major weakness (BEAST) has been mitigated in modern browsers, but other problems remain.
+              Wireshark sniffing packets when MAMP PRO (and HTTPS) is used:
+               TLS v1.1 and v1.2 are both without known security issues, but only v1.2 provides modern cryptographic algorithms.
+                 TLS v1.2 should be used as main protocol because it's the only version that offers modern authenticated encryption 
+                 (also known as AEAD). Work is currently under way to design TLS v1.3, with the aims to remove all obsolete and 
+                 insecure features and to make improvements that will keep our communication secure in the following decades.
+          Testing: Using wireshark sniffing packets and different connection to verify that when used MAMP PRO (and HTTPS connection)
+                   than TLS 1.2 is setted as you can see in the picture below. At the same time when used MAMP (and HTTP connection) 
+                   sensitive data are visible.
+          Proposed Solution: The system administrator will have the responsibility to check this point.
+          Verdict: UNVERIFIABLE
+
+V10 requirement – CONCLUSION
+The V10 requirement, as you can see point by point, is the responsibility of the network administrator who must be able to host
+the application in the correct and above all safe way. So we can remove, instead, the responsibility to the developers of FluxBB 
+that is definitely in the background. It would be nice for the application to point out, to the end user, in the documentation to pay
+attention to what could be the vulnerabilities due to the hosting of the application, with particular attention to the use of HTTPS
+and TLS 1.2 protocol.
+
+
+
+
+
+
+
+
+
