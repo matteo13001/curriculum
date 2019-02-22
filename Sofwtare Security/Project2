@@ -1,0 +1,187 @@
+Project 2
+In this project I added JML annotations to find the bugs. 
+file
+/* ESC/Java2 Exercise: 
+   
+   This class implements a Bag of integers, using an array 
+ and an integer to represent its cardinality.
+
+   Add JML specs to this class, to stop ESC/Java2 from complaining and 
+ to verify that the code performs as requested
+
+   However, beware that there are also errors in the code that you may
+   have to fix to stop ESC/Java2 from complaining. (More generally, 
+   you may improve the code to make it easier to specify in JML, 
+   but _*only*_  if you think this makes the code better/easier 
+   to understand).
+
+   The only JML keywords needed for this are
+      requires
+      invariant 
+      ensures 
+  
+   If you want, you can also use
+      non_null
+   as abbreviation.
+
+
+   While developing your specs, it may be useful to use the keywords
+      assert
+   to add additional assertions in source code, to find out what 
+   ESC/Java2 can - or cannot - prove at a given program point.
+  
+*/
+
+class Bag {
+
+ //@ invariant contents != null;
+  int[] contents;
+  //@ invariant n >= 0;
+  //@ invariant n<=contents.length;
+  int n;
+  
+  //@ requires input != null;
+  Bag(int[] input) {
+    n = input.length;
+    contents = new int[n];
+    arraycopy(input, 0, contents, 0, n);
+  }
+
+  Bag() {
+    n =0;
+    contents = new int[0];
+  }
+
+/* the next method should remove only the first occurrence of elt */
+  void deleteFirst(int elt) {
+  //the = has been removed due to buffer overflow problems
+    for (int i = 0; i < n; i++) {  
+      if (contents[i] == elt ) {
+         n--;
+         contents[i] = contents[n];
+         return;
+      }
+    }
+  }
+
+/* the next method should remove from the array *all* the occurrences of elt */
+  void deleteAll(int elt) {
+  //the = has been removed due to buffer overflow problems
+    for (int i = 0; i < n; i++) {  
+      if (contents[i] == elt ) {
+         n--;
+         contents[i] = contents[n];
+      }
+    }
+  }
+
+
+
+  
+  int getCount(int elt) {
+    int count = 0;
+ //the = has been removed due to buffer overflow problems
+    for (int i = 0; i < n; i++) 
+  //a "=" was added because it generated a syntax error
+  if (contents[i] == elt) count++; 
+    return count;
+  }
+
+  /* Warning: you may have a hard time checking the method "add" below.
+     ESC/Java2 may warn about a very subtle bug not easy to spot. 
+   */
+
+
+  void add(int elt) {
+    if (n == contents.length) {
+ //"+1" has been added because if n = 0 then 2 * n = 0; 
+       int[] new_contents = new int[2*n+1]; 
+       arraycopy(contents, 0, new_contents, 0, n);
+       contents = new_contents;
+    }
+    contents[n]=elt;
+    n++;
+  }
+
+
+//@ requires b != null;
+  void add(Bag b) {
+    int[] new_contents = new int[n + b.n];
+    arraycopy(contents, 0, new_contents, 0, n);
+ //"+1" has been removed at n to avoid buffer overflow problems
+    arraycopy(b.contents, 0, new_contents, n, b.n);
+    contents = new_contents; 
+  }
+
+
+//@ requires a != null;
+  void add(int[] a) {
+    this.add(new Bag(a));
+  }
+
+//@ requires b != null;
+  Bag(Bag b) {
+  //the object has been initialized to avoid buffer overflow problems
+    this(); 
+    this.add(b);
+  }
+
+
+
+//@ requires src != null;
+//@ requires dest != null;
+//@ requires srcOff >= 0;
+//@ requires destOff >= 0;
+//@ requires length >= 0;
+//@ requires dest.length >= destOff + length;
+//@ requires src.length >= srcOff + length;
+  private static void arraycopy(int[] src,
+                                int   srcOff,
+                                int[] dest,
+                                int   destOff,
+                                int   length) {
+ //the = has been removed due to buffer overflow problems
+    for( int i=0 ; i<length; i++) {
+       dest[destOff+i] = src[srcOff+i];
+    }
+  }
+  
+}
+
+
+
+•	In the end, do you think that you found all problems? Are you certain now that the code is correct?
+  I think I found all the problems, but now, because I do not know if, in the future, they can find some other way to attack my system.
+  I can say with certainty that the program is not safe because I added annotations, that is, I have ensured a simpler reading
+  of the code.
+  The code would be correct if I introduced, in the code, the controls expressed in the annotations then I can say to have a code, 
+  at the moment, correct.
+  Example: Bag (int [] a) {
+  if (a == null) new throw Nullpointerexception("null value");
+  ...}
+  So I always handle the exception.
+
+•	Can you think of ways in which the tool or the specification language could be improved? 
+  Yes, ESC / JAVA2 should tell us not only the error but also what causes it so you can check if you need to change the code or 
+  add an annotation (congruent to the reported error). Finally, it could help the programmer by reporting the possible solutions 
+  for each error reported.
+•	Instead of the tool we used, can you think of other ways (formal or informal, tool-supported or not) to find the problems
+  that the tool found? If so, would these alternatives
+    o	find fewer of the problems, the same, or more?
+    o	find problems sooner or later than the current approach?
+    o	require more work or less work?
+    o	provide you with more confidence or less confidence that the code is correct?
+  
+  Yes, you can perform a dynamic analysis of the code by testing it either in white-box or in balck-box (if possible). 
+  The order is important because in the first case there are problems that were not found during the analysis,
+  the design or the programming; in the second case we test a possible external attack by simulating a malintenzinato 
+  that does not know the system (always if possible).
+    1. This can not be said because it depends on the code and the tools used, however, with this method, and with the supervision 
+       of an expert, you can TEST more attacks.
+    2. Find them later because it takes more time to test the code.
+    3. Naturally it requires a lot more work.
+    4. If you test the program correctly, you have a higher security percentage but it is not always SURE.
+
+
+
+
